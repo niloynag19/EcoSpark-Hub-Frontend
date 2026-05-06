@@ -9,6 +9,7 @@ import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 
 const slides = [
   "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=2000",
@@ -79,10 +80,13 @@ export const Hero = () => {
             className="absolute inset-0"
           >
             <div className="absolute inset-0 bg-black/50 z-10" />
-            <img 
+            <Image 
               src={slides[currentSlide]} 
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
               alt="Eco Background"
+              priority
+              quality={80}
             />
           </motion.div>
         </AnimatePresence>

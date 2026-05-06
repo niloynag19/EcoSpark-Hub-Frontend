@@ -5,6 +5,8 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import dynamic from "next/dynamic";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -16,9 +18,7 @@ export const metadata: Metadata = {
   description: "Share and discover eco-friendly innovations to build a greener future.",
 };
 
-import { SmoothScroll } from "@/components/layout/SmoothScroll";
-
-import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { ClientSideControls } from "@/components/layout/ClientSideControls";
 
 export default function RootLayout({
   children,
@@ -35,14 +35,14 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <SmoothScroll>
+            <ClientSideControls>
               <Navbar />
               <main className="min-h-screen">
                 {children}
               </main>
               <Footer />
               <Toaster position="bottom-right" />
-            </SmoothScroll>
+            </ClientSideControls>
           </AuthProvider>
         </NextThemesProvider>
       </body>

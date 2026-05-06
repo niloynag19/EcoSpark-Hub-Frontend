@@ -8,6 +8,7 @@ import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
 
 const latestPosts = [
   {
@@ -68,10 +69,11 @@ export const LatestBlog = () => {
             >
               <Card className="h-full rounded-[2rem] overflow-hidden border-border bg-card hover:border-primary/50 hover:shadow-xl transition-all duration-300 group">
                 <div className="relative aspect-[16/10] overflow-hidden">
-                  <img 
+                  <Image 
                     src={post.image} 
                     alt={post.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500" 
                   />
                   <Badge className="absolute top-4 right-4 bg-background/90 backdrop-blur-md text-foreground border-none">
                     {post.category}

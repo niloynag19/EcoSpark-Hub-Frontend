@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const { user, isAuthenticated, loading } = useAuth();
   const [myIdeas, setMyIdeas] = useState<Idea[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -39,7 +40,10 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, loading]);
 
-  const fetchMyIdeas = async () => {
+  const fetchMyIdeas = async (silent = false) => {
+    if (silent) setIsRefreshing(true);
+    else setIsPageLoading(true);
+    
     try {
       const response = (await api.get("/ideas/my")) as any;
       setMyIdeas(response.data);
@@ -47,6 +51,7 @@ export default function DashboardPage() {
       console.error("Failed to fetch my ideas");
     } finally {
       setIsPageLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -63,7 +68,7 @@ export default function DashboardPage() {
     try {
       await api.patch(`/ideas/${id}/submit`);
       toast.success("Idea submitted for review!");
-      fetchMyIdeas();
+      fetchMyIdeas(true);
     } catch (error) {
       toast.error("Submission failed");
     }
@@ -74,7 +79,7 @@ export default function DashboardPage() {
     try {
       await api.delete(`/ideas/${id}`);
       toast.success("Idea deleted");
-      fetchMyIdeas();
+      fetchMyIdeas(true);
     } catch (error) {
       toast.error("Delete failed");
     }

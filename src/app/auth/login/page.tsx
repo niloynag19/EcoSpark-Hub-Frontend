@@ -104,8 +104,8 @@ export default function LoginPage() {
                   variant="outline" 
                   className="rounded-xl border-dashed border-amber-500/50 text-amber-600 hover:bg-amber-50"
                   onClick={() => {
-                    setEmail("admin@example.com");
-                    setPassword("password123");
+                    setEmail("admin@ecospark.com");
+                    setPassword("admin123");
                   }}
                 >
                   Demo Admin

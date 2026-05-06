@@ -23,7 +23,7 @@ export const IdeaCard = ({ idea, index = 0 }: IdeaCardProps) => {
       className="group"
     >
       <Card className="h-full overflow-hidden border-none shadow-lg hover:shadow-2xl hover:shadow-emerald-500/5 transition-all duration-300 bg-card">
-        <div className="relative aspect-[16/11] overflow-hidden">
+        <div className="relative aspect-[16/9.5] overflow-hidden">
           <img
             src={idea.images && idea.images[0] ? idea.images[0] : "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=1000"}
             alt={idea.title}
@@ -49,7 +49,7 @@ export const IdeaCard = ({ idea, index = 0 }: IdeaCardProps) => {
           </div>
         </div>
         <CardHeader className="p-6 pb-0">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
             <div className="flex items-center gap-1.5">
               <HiCalendar className="w-4 h-4" />
               {new Date(idea.createdAt).toLocaleDateString()}
@@ -59,13 +59,13 @@ export const IdeaCard = ({ idea, index = 0 }: IdeaCardProps) => {
               {idea.author?.name || "EcoSpark User"}
             </div>
           </div>
-          <h3 className="text-2xl md:text-3xl font-black group-hover:text-primary transition-colors line-clamp-2 leading-tight">
+          <h3 className="text-2xl md:text-3xl font-black group-hover:text-primary transition-colors line-clamp-2 leading-tight mb-2">
             {idea.title}
           </h3>
         </CardHeader>
 
         <CardContent className="p-6 pt-4">
-          <p className="text-base text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mb-6">
+          <p className="text-base text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mb-4">
             {idea.description}
           </p>
           

@@ -32,6 +32,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
+
+    // DB Warmup: Ping the database early to wake up serverless instances
+    // This runs in the background and doesn't block the UI
+    api.get("/health/db").catch(() => {});
   }, []);
 
   const login = async (credentials: any) => {

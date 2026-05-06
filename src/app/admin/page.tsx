@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,8 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -58,51 +60,102 @@ export default function AdminDashboard() {
     if (!loading && (!isAuthenticated || !isAdmin)) {
       window.location.href = "/";
     } else if (isAdmin) {
-      fetchAdminData();
+      fetchTabData("initial");
     }
   }, [isAdmin, isAuthenticated, loading]);
 
-  const fetchAdminData = async () => {
-    setIsLoading(true);
+  const fetchedTabs = useRef<Set<string>>(new Set());
+
+  const fetchTabData = useCallback(async (tab: string, silent = false) => {
+    if (!silent && !fetchedTabs.current.has(tab)) setIsLoading(true);
+    else if (silent) setIsRefreshing(true);
+
     try {
-      // Fetch in two smaller batches to avoid overwhelming the DB connection pool
-      const [ideasRes, usersRes] = await Promise.all([
-        api.get("/admin/ideas"),
-        api.get("/admin/users")
-      ]) as any;
-
-      const [statsRes, catsRes] = await Promise.all([
-        api.get("/admin/stats"),
-        api.get("/categories")
-      ]) as any;
-
-      setIdeas(ideasRes.data);
-      setUsers(usersRes.data);
-      setStats(statsRes.data);
-      setCategories(catsRes.data);
+      switch (tab) {
+        case "ideas":
+        case "all-ideas":
+          const ideasRes = (await api.get("/admin/ideas")) as any;
+          setIdeas(ideasRes.data);
+          break;
+        case "users":
+          const usersRes = (await api.get("/admin/users")) as any;
+          setUsers(usersRes.data);
+          break;
+        case "categories":
+          const catsRes = (await api.get("/categories")) as any;
+          setCategories(catsRes.data);
+          break;
+        case "stats":
+          const statsRes = (await api.get("/admin/stats")) as any;
+          setStats(statsRes.data);
+          break;
+        case "initial":
+          const [sRes, iRes] = await Promise.all([
+            api.get("/admin/stats"),
+            api.get("/admin/ideas?status=UNDER_REVIEW")
+          ]) as any;
+          setStats(sRes.data);
+          setIdeas(iRes.data);
+          break;
+      }
+      fetchedTabs.current.add(tab);
     } catch (error: any) {
-      console.error("Failed to fetch admin data:", error.response?.data?.message || error.message || error);
+      console.error(`Failed to fetch ${tab} data:`, error);
+      toast.error(`Failed to sync ${tab} data`);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [isAdmin, activeTab]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab !== "initial") {
+      fetchTabData(activeTab);
+    }
+  }, [activeTab, isAdmin, fetchTabData]);
+
+  // For manual refresh, refresh everything
+  const handleRefreshAll = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchTabData("ideas", true),
+        fetchTabData("users", true),
+        fetchTabData("stats", true),
+        fetchTabData("categories", true)
+      ]);
+      toast.success("Dashboard synced");
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const handleApprove = async (id: string) => {
+    // Optimistic update
+    const previousIdeas = [...ideas];
+    setIdeas(ideas.map(i => i.id === id ? { ...i, status: IdeaStatus.APPROVED } : i));
+    
     try {
       await api.patch(`/admin/ideas/${id}/approve`, {});
       toast.success("Idea approved!");
-      fetchAdminData();
+      fetchTabData(activeTab, true);
     } catch (error) {
+      setIdeas(previousIdeas);
       toast.error("Approval failed");
     }
   };
 
   const handleToggleFeatured = async (id: string) => {
+    // Optimistic update
+    const previousIdeas = [...ideas];
+    setIdeas(ideas.map(i => i.id === id ? { ...i, isFeatured: !i.isFeatured } : i));
+
     try {
       await api.patch(`/admin/ideas/${id}/featured`);
       toast.success("Featured status updated!");
-      fetchAdminData();
+      fetchTabData(activeTab, true);
     } catch (error) {
+      setIdeas(previousIdeas);
       toast.error("Failed to update featured status");
     }
   };
@@ -111,7 +164,7 @@ export default function AdminDashboard() {
     try {
       await api.patch(`/admin/users/${id}/toggle`);
       toast.success("User status updated");
-      fetchAdminData();
+      fetchTabData("users", true);
     } catch (error) {
       toast.error("Failed to update status");
     }
@@ -121,31 +174,55 @@ export default function AdminDashboard() {
     try {
       await api.patch(`/admin/users/${id}/role`, { role });
       toast.success(`Role changed to ${role}`);
-      fetchAdminData();
+      fetchTabData("users", true);
     } catch (error) {
       toast.error("Failed to change role");
     }
   };
 
   const handleDeleteIdea = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this innovation?")) return;
+    // Two-step confirmation logic
+    if (deletingId !== id) {
+      setDeletingId(id);
+      // Auto-reset after 3 seconds
+      setTimeout(() => setDeletingId(null), 3000);
+      return;
+    }
+
+    setDeletingId(null);
+    
+    // Optimistic update
+    const previousIdeas = [...ideas];
+    setIdeas(ideas.filter(i => i.id !== id));
+
     try {
       await api.delete(`/admin/ideas/${id}`);
       toast.success("Idea deleted permanently");
-      fetchAdminData();
-    } catch (error) {
-      toast.error("Delete failed");
+      fetchTabData(activeTab, true);
+    } catch (error: any) {
+      setIdeas(previousIdeas);
+      toast.error(`Delete failed: ${error.response?.data?.message || error.message}`);
     }
   };
 
   const handleReject = async (id: string) => {
     const feedback = prompt("Reason for rejection:");
     if (feedback === null) return;
+    if (!feedback.trim()) {
+      toast.error("Feedback is required for rejection");
+      return;
+    }
+
+    // Optimistic update
+    const previousIdeas = [...ideas];
+    setIdeas(ideas.map(i => i.id === id ? { ...i, status: IdeaStatus.REJECTED, adminFeedback: feedback } : i));
+
     try {
       await api.patch(`/admin/ideas/${id}/reject`, { feedback });
       toast.success("Idea rejected");
-      fetchAdminData();
+      fetchTabData(activeTab, true);
     } catch (error) {
+      setIdeas(previousIdeas);
       toast.error("Rejection failed");
     }
   };
@@ -171,8 +248,17 @@ export default function AdminDashboard() {
                 <p className="text-slate-500 text-sm">Welcome back to the EcoSpark Command Center.</p>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="outline" className="rounded-lg bg-white shadow-sm border-slate-200" onClick={fetchAdminData}>
-                  Refresh
+                <Button 
+                  variant="outline" 
+                  className="rounded-lg bg-white shadow-sm border-slate-200 gap-2" 
+                  onClick={handleRefreshAll}
+                  disabled={isRefreshing}
+                >
+                  {isRefreshing ? (
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    "Refresh"
+                  )}
                 </Button>
                 <Button className="rounded-lg shadow-lg shadow-primary/20">
                   Export Data
@@ -191,7 +277,11 @@ export default function AdminDashboard() {
                 <div key={stat.label} className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-between group hover:shadow-md transition-shadow">
                   <div>
                     <p className="text-sm font-bold text-slate-500 mb-1">{stat.label}</p>
-                    <p className="text-2xl font-black text-slate-800">{stat.value}</p>
+                    {stats ? (
+                      <p className="text-2xl font-black text-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-500">{stat.value}</p>
+                    ) : (
+                      <div className="h-8 w-16 bg-slate-100 animate-pulse rounded-lg" />
+                    )}
                   </div>
                   <div className={cn("p-4 rounded-xl", stat.bg, stat.color)}>
                     <stat.icon className="w-6 h-6" />
@@ -240,11 +330,19 @@ export default function AdminDashboard() {
                             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-2" onClick={() => handleApprove(idea.id)}>
                               <HiCheck className="w-4 h-4" /> Approve
                             </Button>
-                            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5 rounded-lg border-slate-200" onClick={() => handleReject(idea.id)}>
+                            <Button variant="outline" size="sm" className="text-amber-600 hover:bg-amber-50 rounded-lg border-slate-200" onClick={() => handleReject(idea.id)}>
                               Reject
                             </Button>
+                            <Button 
+                              variant={deletingId === idea.id ? "destructive" : "ghost"} 
+                              size="sm" 
+                              className={cn("rounded-lg text-slate-400 hover:text-destructive", deletingId === idea.id && "bg-destructive text-white animate-pulse px-3")}
+                              onClick={() => handleDeleteIdea(idea.id)}
+                            >
+                              {deletingId === idea.id ? "Sure?" : <HiTrash className="w-5 h-5" />}
+                            </Button>
                             <Button variant="ghost" size="sm" className="rounded-lg h-9 w-9 p-0" render={<Link href={`/ideas/${idea.id}`} />}>
-                              <HiEye className="w-5 h-5" />
+                              <HiEye className="w-5 h-5 text-slate-400" />
                             </Button>
                           </div>
                         </div>
@@ -318,8 +416,20 @@ export default function AdminDashboard() {
                                <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-lg" render={<Link href={`/ideas/${idea.id}`} />}>
                                  <HiEye className="w-5 h-5 text-slate-400" />
                                </Button>
-                               <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-lg hover:text-destructive" onClick={() => handleDeleteIdea(idea.id)}>
-                                 <HiTrash className="w-5 h-5" />
+                               <Button 
+                                 variant="ghost" 
+                                 size="sm" 
+                                 className={cn(
+                                   "h-9 px-2 rounded-lg transition-all", 
+                                   deletingId === idea.id ? "bg-destructive text-white hover:bg-destructive/90 w-auto" : "w-9 p-0 hover:text-destructive"
+                                 )} 
+                                 onClick={() => handleDeleteIdea(idea.id)}
+                               >
+                                 {deletingId === idea.id ? (
+                                   <span className="text-[10px] font-bold uppercase">Sure?</span>
+                                 ) : (
+                                   <HiTrash className="w-5 h-5" />
+                                 )}
                                </Button>
                              </div>
                           </td>
