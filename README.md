@@ -66,8 +66,8 @@ client/
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/ecospark-hub.git
-   cd ecospark-hub/client
+   git clone https://github.com/niloynag19/EcoSpark-Hub-Frontend.git
+   cd EcoSpark-Hub-Frontend
    ```
 
 2. **Install dependencies**:
